@@ -113,7 +113,6 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
       required: ["body"],
     },
     execute: async ({ body }) => {
-      console.log({body})
       setBody(body)
       return { success: true }
     },

@@ -97,7 +97,7 @@ export function RichTextEditor({ content, onChange, placeholder = "Write your me
     if (!ed || ed.isDestroyed) return
     const incoming = normalizeContent(content)
     if (ed.getHTML() !== incoming) {
-      ed.commands.setContent(incoming, false /* don't emit update */)
+      ed.commands.setContent(incoming, { emitUpdate: false })
     }
   }, [content])
 
