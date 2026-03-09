@@ -14,9 +14,31 @@ type Props = {
 }
 
 export function EmailContent({ selectedEmail, composing, onStopCompose }: Props) {
-  const [to, setTo] = React.useState("")
+  const [to, setTo] = React.useState<string[]>([])
+  const [toInput, setToInput] = React.useState("")
   const [subject, setSubject] = React.useState("")
   const [body, setBody] = React.useState("")
+
+  const addRecipient = (value: string) => {
+    const trimmed = value.trim().replace(/,+$/, "")
+    if (trimmed && !to.includes(trimmed)) {
+      setTo((prev) => [...prev, trimmed])
+    }
+    setToInput("")
+  }
+
+  const removeRecipient = (email: string) => {
+    setTo((prev) => prev.filter((e) => e !== email))
+  }
+
+  const handleToKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" || e.key === "," || e.key === "Tab") {
+      e.preventDefault()
+      if (toInput.trim()) addRecipient(toInput)
+    } else if (e.key === "Backspace" && toInput === "" && to.length > 0) {
+      setTo((prev) => prev.slice(0, -1))
+    }
+  }
 
   useAgentTool({
     name: "update_recipients",
@@ -25,8 +47,9 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
       type: "object",
       properties: {
         recipients: {
-          type: "string",
-          description: "Comma-separated list of recipient email addresses",
+          type: "array",
+          items: { type: "string" },
+          description: "List of recipient email addresses",
         },
       },
       required: ["recipients"],
@@ -79,7 +102,8 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
   })
 
   const handleDiscard = () => {
-    setTo("")
+    setTo([])
+    setToInput("")
     setSubject("")
     setBody("")
     onStopCompose()
@@ -92,13 +116,42 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
           <h2 className="text-base font-medium">New Message</h2>
         </div>
         <div className="flex flex-1 flex-col gap-0 overflow-auto">
-          <div className="flex items-center gap-2 border-b px-4 py-2">
-            <span className="w-12 text-sm text-muted-foreground">To</span>
-            <Input
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              placeholder="recipient@example.com"
-              className="border-none shadow-none focus-visible:ring-0 p-0 h-8"
+          <div
+            className="flex min-h-10 flex-wrap items-center gap-1.5 border-b px-4 py-2 cursor-text"
+            onClick={() => document.getElementById("to-input")?.focus()}
+          >
+            <span className="text-sm text-muted-foreground shrink-0 w-12">To</span>
+            {to.map((email) => (
+              <span
+                key={email}
+                className="inline-flex items-center gap-1 rounded-md bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground"
+              >
+                {email}
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); removeRecipient(email) }}
+                  className="ml-0.5 rounded-sm opacity-60 hover:opacity-100 focus:outline-none"
+                  tabIndex={-1}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+            <input
+              id="to-input"
+              value={toInput}
+              onChange={(e) => {
+                const val = e.target.value
+                if (val.endsWith(",")) {
+                  addRecipient(val)
+                } else {
+                  setToInput(val)
+                }
+              }}
+              onKeyDown={handleToKeyDown}
+              onBlur={() => { if (toInput.trim()) addRecipient(toInput) }}
+              placeholder={to.length === 0 ? "recipient@example.com" : ""}
+              className="min-w-32 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
           </div>
           <div className="flex items-center gap-2 border-b px-4 py-2">
