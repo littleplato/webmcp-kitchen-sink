@@ -1,0 +1,5 @@
+{
+  "name": "@webmcp-kitchen-sink/shared",
+  "private": true,
+  "main": "./src/index.ts"
+}

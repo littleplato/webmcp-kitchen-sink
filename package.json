@@ -1,0 +1,12 @@
+{
+  "name": "webmcp-kitchen-sink",
+  "private": true,
+  "scripts": {
+    "dev:email": "pnpm --filter email dev",
+    "build:all": "pnpm --filter './apps/*' build",
+    "lint:all": "pnpm --filter './apps/*' lint"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  }
+}
