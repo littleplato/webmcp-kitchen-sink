@@ -1,5 +1,6 @@
 import * as React from "react"
 import { Reply, Forward, Trash2, Send } from "lucide-react"
+import { useAgentTool } from "react-agent-tool"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
@@ -16,6 +17,66 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
   const [to, setTo] = React.useState("")
   const [subject, setSubject] = React.useState("")
   const [body, setBody] = React.useState("")
+
+  useAgentTool({
+    name: "update_recipients",
+    description: "Set the To field of the email draft being composed",
+    inputSchema: {
+      type: "object",
+      properties: {
+        recipients: {
+          type: "string",
+          description: "Comma-separated list of recipient email addresses",
+        },
+      },
+      required: ["recipients"],
+    },
+    execute: async ({ recipients }) => {
+      setTo(recipients)
+      return { success: true }
+    },
+    enabled: composing,
+  })
+
+  useAgentTool({
+    name: "update_subject",
+    description: "Set the subject line of the email draft being composed",
+    inputSchema: {
+      type: "object",
+      properties: {
+        subject: {
+          type: "string",
+          description: "The email subject line",
+        },
+      },
+      required: ["subject"],
+    },
+    execute: async ({ subject }) => {
+      setSubject(subject)
+      return { success: true }
+    },
+    enabled: composing,
+  })
+
+  useAgentTool({
+    name: "update_message_body",
+    description: "Set the body content of the email draft being composed",
+    inputSchema: {
+      type: "object",
+      properties: {
+        body: {
+          type: "string",
+          description: "The full body text of the email",
+        },
+      },
+      required: ["body"],
+    },
+    execute: async ({ body }) => {
+      setBody(body)
+      return { success: true }
+    },
+    enabled: composing,
+  })
 
   const handleDiscard = () => {
     setTo("")
