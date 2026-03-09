@@ -1,8 +1,8 @@
 import * as React from "react"
 import { Reply, Forward, Trash2, Send } from "lucide-react"
 import { useAgentTool } from "react-agent-tool"
+import { RichTextEditor } from "@/components/rich-text-editor"
 import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import type { Email } from "@/data/emails"
@@ -17,7 +17,7 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
   const [to, setTo] = React.useState<string[]>([])
   const [toInput, setToInput] = React.useState("")
   const [subject, setSubject] = React.useState("")
-  const [body, setBody] = React.useState("")
+  const [body, setBody] = React.useState("<p></p>")
 
   const addRecipient = (value: string) => {
     const trimmed = value.trim().replace(/,+$/, "")
@@ -83,18 +83,19 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
 
   useAgentTool({
     name: "update_message_body",
-    description: "Set the body content of the email draft being composed",
+    description: "Set the body of the email draft. Accepts HTML with full formatting: headings, bold, italic, lists, blockquotes, tables, links, code blocks, and horizontal rules.",
     inputSchema: {
       type: "object",
       properties: {
         body: {
           type: "string",
-          description: "The full body text of the email",
+          description: "HTML content for the email body. Supports: h2, h3, strong, em, s, code, pre, ul/ol/li, blockquote, table/thead/tbody/tr/th/td, a href, hr",
         },
       },
       required: ["body"],
     },
     execute: async ({ body }) => {
+      console.log({body})
       setBody(body)
       return { success: true }
     },
@@ -163,11 +164,10 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
               className="border-none shadow-none focus-visible:ring-0 p-0 h-8"
             />
           </div>
-          <Textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="Write your message..."
-            className="flex-1 resize-none rounded-none border-none shadow-none focus-visible:ring-0 p-4 min-h-0 h-full"
+          <RichTextEditor
+            content={body}
+            onChange={setBody}
+            placeholder="Write your message…"
           />
         </div>
         <Separator />
