@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Reply, Forward, Trash2, Send, Bot } from "lucide-react"
+import { Reply, Forward, Trash2, Send, Bot, Search, Check } from "lucide-react"
 import { useAgentTool } from "react-agent-tool"
 import { RichTextEditor } from "@/components/rich-text-editor"
 import { Button } from "@/components/ui/button"
@@ -35,6 +35,18 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
   const [bccInput, setBccInput] = React.useState("")
   const [showCc, setShowCc] = React.useState(false)
   const [showBcc, setShowBcc] = React.useState(false)
+  const [addressLookup, setAddressLookup] = React.useState<{
+    phase: "idle" | "looking" | "resolved"
+    names: string[]
+    resolved: { name: string; email: string }[]
+  }>({ phase: "idle", names: [], resolved: [] })
+
+  React.useEffect(() => {
+    if (addressLookup.phase === "resolved") {
+      const t = setTimeout(() => setAddressLookup((s) => ({ ...s, phase: "idle" })), 2200)
+      return () => clearTimeout(t)
+    }
+  }, [addressLookup.phase])
   const [subject, setSubject] = React.useState("")
   const [body, setBody] = React.useState("<p></p>")
 
@@ -95,14 +107,25 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
       },
     },
     execute: async ({ to: toVal, cc: ccVal, bcc: bccVal }) => {
+      const allNames = [...(toVal ?? []), ...(ccVal ?? []), ...(bccVal ?? [])]
+      setAddressLookup({ phase: "looking", names: allNames, resolved: [] })
+
       const [resolvedTo, resolvedCc, resolvedBcc] = await Promise.all([
         toVal ? lookupAddresses(toVal) : Promise.resolve(undefined),
         ccVal ? lookupAddresses(ccVal) : Promise.resolve(undefined),
         bccVal ? lookupAddresses(bccVal) : Promise.resolve(undefined),
       ])
+
+      const resolvedPairs: { name: string; email: string }[] = []
+      toVal?.forEach((n, i) => resolvedPairs.push({ name: n, email: resolvedTo![i] }))
+      ccVal?.forEach((n, i) => resolvedPairs.push({ name: n, email: resolvedCc![i] }))
+      bccVal?.forEach((n, i) => resolvedPairs.push({ name: n, email: resolvedBcc![i] }))
+
       if (resolvedTo !== undefined) setTo(resolvedTo)
       if (resolvedCc !== undefined) { setCc(resolvedCc); if (resolvedCc.length > 0) setShowCc(true) }
       if (resolvedBcc !== undefined) { setBcc(resolvedBcc); if (resolvedBcc.length > 0) setShowBcc(true) }
+
+      setAddressLookup({ phase: "resolved", names: allNames, resolved: resolvedPairs })
       return { success: true }
     },
     enabled: composing,
@@ -148,14 +171,13 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
     enabled: composing,
   })
 
-  const executingTool = addressState.isExecuting
-    ? "address book"
-    : subjectState.isExecuting
+  const showAddressCard = addressState.isExecuting || addressLookup.phase !== "idle"
+  const genericTool = subjectState.isExecuting
     ? "subject line"
     : bodyState.isExecuting
     ? "message body"
     : null
-  const isAnyExecuting = executingTool !== null
+  const isAnyExecuting = showAddressCard || genericTool !== null
 
   const handleDiscard = () => {
     setTo([])
@@ -201,6 +223,19 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
             0%, 100% { opacity: 1; }
             50% { opacity: 0; }
           }
+          @keyframes check-pop {
+            0% { transform: scale(0) rotate(-45deg); opacity: 0; }
+            60% { transform: scale(1.3) rotate(5deg); }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+          }
+          @keyframes email-reveal {
+            from { opacity: 0; transform: translateX(-6px); }
+            to { opacity: 1; transform: translateX(0); }
+          }
+          @keyframes row-resolved {
+            from { background-color: hsl(var(--primary) / 0.08); }
+            to { background-color: transparent; }
+          }
           .scan-beam {
             animation: scan-beam 2s ease-in-out infinite;
           }
@@ -229,29 +264,88 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
                 }}
               />
 
-              {/* Status badge */}
+              {/* Status content */}
               <div className="ai-badge absolute inset-0 flex items-center justify-center">
-                <div
-                  className="flex flex-col items-center gap-3"
-                  style={{ animation: 'ai-glow 2s ease-in-out infinite' }}
-                >
+                {showAddressCard ? (
+                  /* Address book lookup card */
                   <div
-                    className="flex items-center gap-2.5 rounded-full border bg-background/95 px-5 py-2.5 shadow-xl"
-                    style={{ borderColor: 'hsl(var(--primary) / 0.4)' }}
+                    className="rounded-xl border bg-background/97 shadow-2xl overflow-hidden"
+                    style={{ minWidth: 260, borderColor: 'hsl(var(--primary) / 0.3)' }}
                   >
-                    <Bot className="size-4 text-primary" />
-                    <span className="text-sm font-medium text-foreground">
-                      Writing {executingTool}
-                    </span>
-                    <span className="ai-cursor text-primary font-bold text-base leading-none">|</span>
-                    <div className="flex items-center gap-1 ml-1">
-                      <div className="dot-1 size-1.5 rounded-full bg-primary" />
-                      <div className="dot-2 size-1.5 rounded-full bg-primary" />
-                      <div className="dot-3 size-1.5 rounded-full bg-primary" />
+                    {/* Card header */}
+                    <div
+                      className="flex items-center gap-2 px-4 py-3 border-b"
+                      style={{ borderColor: 'hsl(var(--primary) / 0.15)', background: 'hsl(var(--primary) / 0.04)' }}
+                    >
+                      {addressLookup.phase === "looking" ? (
+                        <Search className="size-3.5 text-primary" style={{ animation: 'dot-pulse 1.4s ease-in-out infinite' }} />
+                      ) : (
+                        <Check className="size-3.5 text-green-500" />
+                      )}
+                      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        {addressLookup.phase === "looking" ? "Searching address book…" : "Contacts resolved"}
+                      </span>
+                    </div>
+                    {/* Rows */}
+                    <div className="flex flex-col divide-y">
+                      {addressLookup.names.map((name, i) => {
+                        const resolvedEntry = addressLookup.resolved[i]
+                        return (
+                          <div
+                            key={name}
+                            className="flex items-center gap-3 px-4 py-2.5"
+                            style={resolvedEntry ? { animation: `row-resolved 0.8s ease-out ${i * 0.12}s both` } : undefined}
+                          >
+                            {resolvedEntry ? (
+                              <>
+                                <Check
+                                  className="size-3.5 shrink-0 text-green-500"
+                                  style={{ animation: `check-pop 0.35s cubic-bezier(0.175,0.885,0.32,1.275) ${i * 0.12}s both` }}
+                                />
+                                <div style={{ animation: `email-reveal 0.25s ease-out ${i * 0.12 + 0.1}s both`, opacity: 0 }}>
+                                  <span className="text-sm font-medium text-foreground">{name}</span>
+                                  <span className="text-xs text-muted-foreground ml-2">{resolvedEntry.email}</span>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="flex gap-0.5 shrink-0">
+                                  <div className="dot-1 size-1 rounded-full bg-muted-foreground" />
+                                  <div className="dot-2 size-1 rounded-full bg-muted-foreground" />
+                                  <div className="dot-3 size-1 rounded-full bg-muted-foreground" />
+                                </div>
+                                <span className="text-sm text-muted-foreground">{name}</span>
+                              </>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">AI is updating your draft — editing paused</p>
-                </div>
+                ) : (
+                  /* Generic badge for subject / body */
+                  <div
+                    className="flex flex-col items-center gap-3"
+                    style={{ animation: 'ai-glow 2s ease-in-out infinite' }}
+                  >
+                    <div
+                      className="flex items-center gap-2.5 rounded-full border bg-background/95 px-5 py-2.5 shadow-xl"
+                      style={{ borderColor: 'hsl(var(--primary) / 0.4)' }}
+                    >
+                      <Bot className="size-4 text-primary" />
+                      <span className="text-sm font-medium text-foreground">
+                        Writing {genericTool}
+                      </span>
+                      <span className="ai-cursor text-primary font-bold text-base leading-none">|</span>
+                      <div className="flex items-center gap-1 ml-1">
+                        <div className="dot-1 size-1.5 rounded-full bg-primary" />
+                        <div className="dot-2 size-1.5 rounded-full bg-primary" />
+                        <div className="dot-3 size-1.5 rounded-full bg-primary" />
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">AI is updating your draft — editing paused</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
