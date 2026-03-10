@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Reply, Forward, Trash2, Send } from "lucide-react"
+import { Reply, Forward, Trash2, Send, Bot } from "lucide-react"
 import { useAgentTool } from "react-agent-tool"
 import { RichTextEditor } from "@/components/rich-text-editor"
 import { Button } from "@/components/ui/button"
@@ -58,7 +58,7 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
   const ccHandlers = makeChipHandlers(cc, setCc, ccInput, setCcInput)
   const bccHandlers = makeChipHandlers(bcc, setBcc, bccInput, setBccInput)
 
-  useAgentTool({
+  const { state: addressState } = useAgentTool({
     name: "update_email_addresses",
     description: "Set the To, CC, and/or BCC fields of the email draft being composed",
     inputSchema: {
@@ -82,6 +82,7 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
       },
     },
     execute: async ({ to: toVal, cc: ccVal, bcc: bccVal }) => {
+      await new Promise((resolve) => setTimeout(resolve, 1800))
       if (toVal !== undefined) setTo(toVal)
       if (ccVal !== undefined) { setCc(ccVal); if (ccVal.length > 0) setShowCc(true) }
       if (bccVal !== undefined) { setBcc(bccVal); if (bccVal.length > 0) setShowBcc(true) }
@@ -90,7 +91,7 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
     enabled: composing,
   })
 
-  useAgentTool({
+  const { state: subjectState } = useAgentTool({
     name: "update_subject",
     description: "Set the subject line of the email draft being composed",
     inputSchema: {
@@ -110,7 +111,7 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
     enabled: composing,
   })
 
-  useAgentTool({
+  const { state: bodyState } = useAgentTool({
     name: "update_message_body",
     description: "Set the body of the email draft. Accepts HTML with full formatting: headings, bold, italic, lists, blockquotes, tables, links, code blocks, and horizontal rules.",
     inputSchema: {
@@ -130,6 +131,15 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
     enabled: composing,
   })
 
+  const executingTool = addressState.isExecuting
+    ? "address book"
+    : subjectState.isExecuting
+    ? "subject line"
+    : bodyState.isExecuting
+    ? "message body"
+    : null
+  const isAnyExecuting = executingTool !== null
+
   const handleDiscard = () => {
     setTo([])
     setToInput("")
@@ -147,9 +157,87 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
   if (composing) {
     return (
       <div className="flex h-full flex-col">
+        <style>{`
+          @keyframes scan-beam {
+            0% { top: 0%; opacity: 0; }
+            5% { opacity: 1; }
+            95% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+          }
+          @keyframes dot-pulse {
+            0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+            40% { transform: scale(1); opacity: 1; }
+          }
+          @keyframes ai-glow {
+            0%, 100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.3); }
+            50% { box-shadow: 0 0 0 6px hsl(var(--primary) / 0); }
+          }
+          @keyframes fade-in {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+          @keyframes slide-up {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          @keyframes typewriter-blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+          }
+          .scan-beam {
+            animation: scan-beam 2s ease-in-out infinite;
+          }
+          .dot-1 { animation: dot-pulse 1.4s ease-in-out 0s infinite; }
+          .dot-2 { animation: dot-pulse 1.4s ease-in-out 0.2s infinite; }
+          .dot-3 { animation: dot-pulse 1.4s ease-in-out 0.4s infinite; }
+          .ai-overlay { animation: fade-in 0.15s ease-out forwards; }
+          .ai-badge { animation: slide-up 0.2s ease-out forwards; }
+          .ai-cursor { animation: typewriter-blink 0.8s step-end infinite; }
+        `}</style>
         <div className="border-b p-4">
           <h2 className="text-base font-medium">New Message</h2>
         </div>
+        <div className="relative flex flex-1 flex-col gap-0 overflow-auto">
+          {isAnyExecuting && (
+            <div className="ai-overlay absolute inset-0 z-20 overflow-hidden" style={{ pointerEvents: 'all' }}>
+              {/* Frosted backdrop */}
+              <div className="absolute inset-0 bg-background/70 backdrop-blur-[1.5px]" />
+
+              {/* Scanning beam */}
+              <div
+                className="scan-beam absolute inset-x-0 h-[3px]"
+                style={{
+                  background: 'linear-gradient(90deg, transparent 0%, hsl(var(--primary) / 0.6) 30%, hsl(var(--primary)) 50%, hsl(var(--primary) / 0.6) 70%, transparent 100%)',
+                  filter: 'blur(1px)',
+                }}
+              />
+
+              {/* Status badge */}
+              <div className="ai-badge absolute inset-0 flex items-center justify-center">
+                <div
+                  className="flex flex-col items-center gap-3"
+                  style={{ animation: 'ai-glow 2s ease-in-out infinite' }}
+                >
+                  <div
+                    className="flex items-center gap-2.5 rounded-full border bg-background/95 px-5 py-2.5 shadow-xl"
+                    style={{ borderColor: 'hsl(var(--primary) / 0.4)' }}
+                  >
+                    <Bot className="size-4 text-primary" />
+                    <span className="text-sm font-medium text-foreground">
+                      Writing {executingTool}
+                    </span>
+                    <span className="ai-cursor text-primary font-bold text-base leading-none">|</span>
+                    <div className="flex items-center gap-1 ml-1">
+                      <div className="dot-1 size-1.5 rounded-full bg-primary" />
+                      <div className="dot-2 size-1.5 rounded-full bg-primary" />
+                      <div className="dot-3 size-1.5 rounded-full bg-primary" />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">AI is updating your draft — editing paused</p>
+                </div>
+              </div>
+            </div>
+          )}
         <div className="flex flex-1 flex-col gap-0 overflow-auto">
           <div
             className="flex min-h-10 flex-wrap items-center gap-1.5 border-b px-4 py-2 cursor-text"
@@ -284,6 +372,7 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
             onChange={setBody}
             placeholder="Write your message…"
           />
+        </div>
         </div>
         <Separator />
         <div className="flex items-center gap-2 p-4">
