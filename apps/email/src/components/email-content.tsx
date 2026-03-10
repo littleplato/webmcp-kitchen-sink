@@ -7,6 +7,19 @@ import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import type { Email } from "@/data/emails"
 
+const ADDRESS_BOOK: Record<string, string> = {
+  "John Smith": "john.smith@company.com",
+  "Sarah Johnson": "sarah.johnson@company.com",
+  "Michael Chen": "michael.chen@company.com",
+  "Emily Davis": "emily.davis@company.com",
+  "Alex Rodriguez": "alex.rodriguez@company.com",
+}
+
+async function lookupAddresses(names: string[]): Promise<string[]> {
+  await new Promise((resolve) => setTimeout(resolve, 1800))
+  return names.map((name) => ADDRESS_BOOK[name] ?? name)
+}
+
 type Props = {
   selectedEmail: Email | null
   composing: boolean
@@ -60,32 +73,36 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
 
   const { state: addressState } = useAgentTool({
     name: "update_email_addresses",
-    description: "Set the To, CC, and/or BCC fields of the email draft being composed",
+    description: `Set the To, CC, and/or BCC fields of the email draft by looking up recipients in the address book. Pass full names in natural language — the address book will resolve them to email addresses. Only the following names are in the address book: ${Object.keys(ADDRESS_BOOK).join(", ")}.`,
     inputSchema: {
       type: "object",
       properties: {
         to: {
           type: "array",
           items: { type: "string" },
-          description: "List of primary recipient email addresses",
+          description: "Full names of primary recipients, e.g. [\"John Smith\"]",
         },
         cc: {
           type: "array",
           items: { type: "string" },
-          description: "List of CC recipient email addresses",
+          description: "Full names of CC recipients",
         },
         bcc: {
           type: "array",
           items: { type: "string" },
-          description: "List of BCC recipient email addresses",
+          description: "Full names of BCC recipients",
         },
       },
     },
     execute: async ({ to: toVal, cc: ccVal, bcc: bccVal }) => {
-      await new Promise((resolve) => setTimeout(resolve, 1800))
-      if (toVal !== undefined) setTo(toVal)
-      if (ccVal !== undefined) { setCc(ccVal); if (ccVal.length > 0) setShowCc(true) }
-      if (bccVal !== undefined) { setBcc(bccVal); if (bccVal.length > 0) setShowBcc(true) }
+      const [resolvedTo, resolvedCc, resolvedBcc] = await Promise.all([
+        toVal ? lookupAddresses(toVal) : Promise.resolve(undefined),
+        ccVal ? lookupAddresses(ccVal) : Promise.resolve(undefined),
+        bccVal ? lookupAddresses(bccVal) : Promise.resolve(undefined),
+      ])
+      if (resolvedTo !== undefined) setTo(resolvedTo)
+      if (resolvedCc !== undefined) { setCc(resolvedCc); if (resolvedCc.length > 0) setShowCc(true) }
+      if (resolvedBcc !== undefined) { setBcc(resolvedBcc); if (resolvedBcc.length > 0) setShowBcc(true) }
       return { success: true }
     },
     enabled: composing,
