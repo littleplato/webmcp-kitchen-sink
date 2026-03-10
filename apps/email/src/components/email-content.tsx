@@ -196,56 +196,6 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
   if (composing) {
     return (
       <div className="flex h-full flex-col">
-        <style>{`
-          @keyframes scan-beam {
-            0% { top: 0%; opacity: 0; }
-            5% { opacity: 1; }
-            95% { opacity: 1; }
-            100% { top: 100%; opacity: 0; }
-          }
-          @keyframes dot-pulse {
-            0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
-            40% { transform: scale(1); opacity: 1; }
-          }
-          @keyframes ai-glow {
-            0%, 100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.3); }
-            50% { box-shadow: 0 0 0 6px hsl(var(--primary) / 0); }
-          }
-          @keyframes fade-in {
-            from { opacity: 0; }
-            to { opacity: 1; }
-          }
-          @keyframes slide-up {
-            from { opacity: 0; transform: translateY(8px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-          @keyframes typewriter-blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0; }
-          }
-          @keyframes check-pop {
-            0% { transform: scale(0) rotate(-45deg); opacity: 0; }
-            60% { transform: scale(1.3) rotate(5deg); }
-            100% { transform: scale(1) rotate(0deg); opacity: 1; }
-          }
-          @keyframes email-reveal {
-            from { opacity: 0; transform: translateX(-6px); }
-            to { opacity: 1; transform: translateX(0); }
-          }
-          @keyframes row-resolved {
-            from { background-color: hsl(var(--primary) / 0.08); }
-            to { background-color: transparent; }
-          }
-          .scan-beam {
-            animation: scan-beam 2s ease-in-out infinite;
-          }
-          .dot-1 { animation: dot-pulse 1.4s ease-in-out 0s infinite; }
-          .dot-2 { animation: dot-pulse 1.4s ease-in-out 0.2s infinite; }
-          .dot-3 { animation: dot-pulse 1.4s ease-in-out 0.4s infinite; }
-          .ai-overlay { animation: fade-in 0.15s ease-out forwards; }
-          .ai-badge { animation: slide-up 0.2s ease-out forwards; }
-          .ai-cursor { animation: typewriter-blink 0.8s step-end infinite; }
-        `}</style>
         <div className="border-b p-4">
           <h2 className="text-base font-medium">New Message</h2>
         </div>
