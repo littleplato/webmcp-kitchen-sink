@@ -59,21 +59,32 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
   const bccHandlers = makeChipHandlers(bcc, setBcc, bccInput, setBccInput)
 
   useAgentTool({
-    name: "update_recipients",
-    description: "Set the To field of the email draft being composed",
+    name: "update_email_addresses",
+    description: "Set the To, CC, and/or BCC fields of the email draft being composed",
     inputSchema: {
       type: "object",
       properties: {
-        recipients: {
+        to: {
           type: "array",
           items: { type: "string" },
-          description: "List of recipient email addresses",
+          description: "List of primary recipient email addresses",
+        },
+        cc: {
+          type: "array",
+          items: { type: "string" },
+          description: "List of CC recipient email addresses",
+        },
+        bcc: {
+          type: "array",
+          items: { type: "string" },
+          description: "List of BCC recipient email addresses",
         },
       },
-      required: ["recipients"],
     },
-    execute: async ({ recipients }) => {
-      setTo(recipients)
+    execute: async ({ to: toVal, cc: ccVal, bcc: bccVal }) => {
+      if (toVal !== undefined) setTo(toVal)
+      if (ccVal !== undefined) { setCc(ccVal); if (ccVal.length > 0) setShowCc(true) }
+      if (bccVal !== undefined) { setBcc(bccVal); if (bccVal.length > 0) setShowBcc(true) }
       return { success: true }
     },
     enabled: composing,
@@ -114,50 +125,6 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
     },
     execute: async ({ body }) => {
       setBody(body)
-      return { success: true }
-    },
-    enabled: composing,
-  })
-
-  useAgentTool({
-    name: "update_cc",
-    description: "Set the CC field of the email draft being composed",
-    inputSchema: {
-      type: "object",
-      properties: {
-        recipients: {
-          type: "array",
-          items: { type: "string" },
-          description: "List of CC recipient email addresses",
-        },
-      },
-      required: ["recipients"],
-    },
-    execute: async ({ recipients }) => {
-      setCc(recipients)
-      if (recipients.length > 0) setShowCc(true)
-      return { success: true }
-    },
-    enabled: composing,
-  })
-
-  useAgentTool({
-    name: "update_bcc",
-    description: "Set the BCC field of the email draft being composed",
-    inputSchema: {
-      type: "object",
-      properties: {
-        recipients: {
-          type: "array",
-          items: { type: "string" },
-          description: "List of BCC recipient email addresses",
-        },
-      },
-      required: ["recipients"],
-    },
-    execute: async ({ recipients }) => {
-      setBcc(recipients)
-      if (recipients.length > 0) setShowBcc(true)
       return { success: true }
     },
     enabled: composing,
