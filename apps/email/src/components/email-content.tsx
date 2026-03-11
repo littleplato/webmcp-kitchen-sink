@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Reply, Forward, Trash2, Send, Bot, Search, Check } from "lucide-react"
+import { Reply, Forward, Trash2, Send, Bot, Search, Check, Paperclip, FileText, X } from "lucide-react"
 import { useAgentTool } from "react-agent-tool"
 import { RichTextEditor } from "@/components/rich-text-editor"
 import { Button } from "@/components/ui/button"
@@ -159,13 +159,49 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
     enabled: composing,
   })
 
+  const [attachments, setAttachments] = React.useState<{ name: string; size: string; type: string }[]>([])
+
+  const { state: attachState } = useAgentTool({
+    name: "attach_files",
+    description: "Attach relevant files to the email draft. The file picker will be shown to the user and the selected files will be attached.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        files: {
+          type: "array",
+          items: { type: "string" },
+          description: "List of file names to attach, e.g. [\"proposal.docx\"]",
+        },
+      },
+      required: ["files"],
+    },
+    execute: async ({ files }) => {
+      await new Promise((resolve) => setTimeout(resolve, 1800))
+      const randomSize = () => {
+        const n = Math.random()
+        if (n < 0.4) return `${Math.floor(Math.random() * 900 + 50)} KB`
+        if (n < 0.8) return `${(Math.random() * 9 + 0.5).toFixed(1)} MB`
+        return `${Math.floor(Math.random() * 48 + 8)} KB`
+      }
+      setAttachments((prev) => {
+        const existing = new Set(prev.map((a) => a.name))
+        const toAdd = files
+          .filter((name) => !existing.has(name))
+          .map((name) => ({ name, size: randomSize(), type: name.split(".").pop() ?? "file" }))
+        return [...prev, ...toAdd]
+      })
+      return { success: true, attached: files }
+    },
+    enabled: composing,
+  })
+
   const showAddressCard = addressState.isExecuting || addressLookup.phase !== "idle"
   const genericTool = subjectState.isExecuting
     ? "subject line"
     : bodyState.isExecuting
     ? "message body"
     : null
-  const isAnyExecuting = showAddressCard || genericTool !== null
+  const isAnyExecuting = showAddressCard || genericTool !== null || attachState.isExecuting
 
   const handleDiscard = () => {
     setTo([])
@@ -178,79 +214,206 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
     setShowBcc(false)
     setSubject("")
     setBody("")
+    setAttachments([])
     onStopCompose()
   }
 
   if (composing) {
     return (
-      <div className="flex h-full flex-col">
+      <div className="flex h-full flex-col relative">
         <div className="border-b p-4">
           <h2 className="text-base font-medium">New Message</h2>
         </div>
-        <div className="relative flex flex-1 flex-col gap-0 overflow-auto">
-          {isAnyExecuting && (
-            <div className="ai-overlay absolute inset-0 z-20 overflow-hidden" style={{ pointerEvents: 'all' }}>
-              {/* Frosted backdrop */}
-              <div className="absolute inset-0 bg-background/70 backdrop-blur-[1.5px]" />
+        {isAnyExecuting && (
+          <div
+            className="agent-takeover-backdrop absolute inset-0 z-20 overflow-hidden flex items-center justify-center"
+            style={{ pointerEvents: 'all', background: 'hsl(var(--background) / 0.82)', backdropFilter: 'blur(8px)' }}
+          >
+              {showAddressCard ? (
+                /* ── AGENT TAKEOVER: Address book ── */
+                <div className="agent-takeover-card flex flex-col items-center gap-5 px-6 py-8 relative" style={{ minWidth: 320, maxWidth: 420 }}>
 
-              {/* Scanning beam */}
-              <div
-                className="scan-beam absolute inset-x-0 h-[3px]"
-                style={{
-                  background: 'linear-gradient(90deg, transparent 0%, hsl(var(--primary) / 0.6) 30%, hsl(var(--primary)) 50%, hsl(var(--primary) / 0.6) 70%, transparent 100%)',
-                  filter: 'blur(1px)',
-                }}
-              />
+                  {/* Grid lines background */}
+                  <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl" style={{ opacity: 0.06 }}>
+                    <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                      <defs>
+                        <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
+                          <path d="M 24 0 L 0 0 0 24" fill="none" stroke="hsl(var(--primary))" strokeWidth="0.5"/>
+                        </pattern>
+                      </defs>
+                      <rect width="100%" height="100%" fill="url(#grid)" />
+                    </svg>
+                  </div>
 
-              {/* Status content */}
-              <div className="ai-badge absolute inset-0 flex items-center justify-center">
-                {showAddressCard ? (
-                  /* Address book lookup card */
+                  {/* Scanning line across the card */}
                   <div
-                    className="rounded-xl border bg-background/97 shadow-2xl overflow-hidden"
-                    style={{ minWidth: 260, borderColor: 'hsl(var(--primary) / 0.3)' }}
-                  >
-                    {/* Card header */}
+                    className="agent-scan-line absolute inset-x-0 h-[2px] pointer-events-none"
+                    style={{
+                      background: 'linear-gradient(90deg, transparent 0%, hsl(var(--primary) / 0.8) 20%, hsl(var(--primary)) 50%, hsl(var(--primary) / 0.8) 80%, transparent 100%)',
+                      filter: 'blur(1px)',
+                      zIndex: 10,
+                    }}
+                  />
+
+                  {/* Orbital icon cluster */}
+                  <div className="relative flex items-center justify-center" style={{ width: 88, height: 88 }}>
+                    {/* Pulse rings */}
                     <div
-                      className="flex items-center gap-2 px-4 py-3 border-b"
-                      style={{ borderColor: 'hsl(var(--primary) / 0.15)', background: 'hsl(var(--primary) / 0.04)' }}
+                      className="agent-pulse-ring absolute inset-0 rounded-full"
+                      style={{ border: '2px solid hsl(var(--primary) / 0.6)' }}
+                    />
+                    <div
+                      className="agent-pulse-ring-2 absolute inset-0 rounded-full"
+                      style={{ border: '1px solid hsl(var(--primary) / 0.3)' }}
+                    />
+                    {/* Outer spinning ring */}
+                    <div
+                      className="agent-icon-spin absolute inset-[-8px] rounded-full"
+                      style={{
+                        border: '2px dashed hsl(var(--primary) / 0.35)',
+                      }}
+                    />
+                    {/* Inner counter-spinning ring */}
+                    <div
+                      className="agent-icon-spin-reverse absolute inset-[-2px] rounded-full"
+                      style={{
+                        border: '1.5px solid transparent',
+                        background: 'linear-gradient(hsl(var(--background)), hsl(var(--background))) padding-box, conic-gradient(from 0deg, hsl(var(--primary)), transparent 40%, hsl(var(--primary)) 60%, transparent) border-box',
+                      }}
+                    />
+                    {/* Orbiting dots */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="agent-orbit-dot absolute size-2 rounded-full bg-primary shadow-[0_0_6px_hsl(var(--primary))]" />
+                      <div className="agent-orbit-dot-2 absolute size-1.5 rounded-full" style={{ background: 'hsl(var(--primary) / 0.7)', boxShadow: '0 0 4px hsl(var(--primary))' }} />
+                      <div className="agent-orbit-dot-3 absolute size-1.5 rounded-full" style={{ background: 'hsl(var(--primary) / 0.5)', boxShadow: '0 0 4px hsl(var(--primary))' }} />
+                    </div>
+                    {/* Core icon */}
+                    <div
+                      className="relative flex items-center justify-center rounded-full size-14"
+                      style={{
+                        background: 'radial-gradient(circle, hsl(var(--primary) / 0.15) 0%, hsl(var(--primary) / 0.05) 100%)',
+                        border: '1.5px solid hsl(var(--primary) / 0.4)',
+                        boxShadow: '0 0 20px hsl(var(--primary) / 0.2), inset 0 0 12px hsl(var(--primary) / 0.1)',
+                      }}
                     >
                       {addressLookup.phase === "looking" ? (
-                        <Search className="size-3.5 text-primary" style={{ animation: 'dot-pulse 1.4s ease-in-out infinite' }} />
+                        <Bot className="size-7 text-primary" style={{ filter: 'drop-shadow(0 0 6px hsl(var(--primary) / 0.8))' }} />
                       ) : (
-                        <Check className="size-3.5 text-green-500" />
+                        <Check
+                          className="size-7 text-green-400"
+                          style={{
+                            animation: 'agent-success-burst 0.5s cubic-bezier(0.34,1.56,0.64,1) both',
+                            filter: 'drop-shadow(0 0 8px rgb(74 222 128 / 0.8))',
+                          }}
+                        />
                       )}
-                      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    </div>
+                  </div>
+
+                  {/* "AGENT" badge */}
+                  <div className="flex flex-col items-center gap-1.5">
+                    <div
+                      className="flex items-center gap-1.5 rounded-full px-3 py-1"
+                      style={{
+                        background: 'hsl(var(--primary) / 0.1)',
+                        border: '1px solid hsl(var(--primary) / 0.3)',
+                      }}
+                    >
+                      <div className="dot-1 size-1.5 rounded-full bg-primary" />
+                      <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-primary">Agent Active</span>
+                      <div className="dot-3 size-1.5 rounded-full bg-primary" />
+                    </div>
+
+                    {/* Big dramatic title */}
+                    {addressLookup.phase === "looking" ? (
+                      <>
+                        <h2
+                          className="agent-title text-2xl font-black tracking-[0.12em] uppercase text-center"
+                          style={{ color: 'hsl(var(--primary))' }}
+                        >
+                          Scanning Contacts
+                        </h2>
+                        <p className="text-xs text-muted-foreground tracking-wide text-center">
+                          The agent is infiltrating your address book
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <h2
+                          className="text-2xl font-black tracking-[0.12em] uppercase text-center text-green-400"
+                          style={{
+                            animation: 'agent-success-burst 0.5s cubic-bezier(0.34,1.56,0.64,1) both',
+                            textShadow: '0 0 20px rgb(74 222 128 / 0.6)',
+                          }}
+                        >
+                          Contacts Found!
+                        </h2>
+                        <p className="text-xs text-muted-foreground tracking-wide text-center">
+                          All contacts locked in
+                        </p>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Contact rows */}
+                  <div
+                    className="w-full rounded-xl overflow-hidden"
+                    style={{
+                      border: '1px solid hsl(var(--primary) / 0.2)',
+                      background: 'hsl(var(--background) / 0.9)',
+                    }}
+                  >
+                    {/* Header bar */}
+                    <div
+                      className="flex items-center gap-2 px-3 py-2 border-b"
+                      style={{ borderColor: 'hsl(var(--primary) / 0.15)', background: 'hsl(var(--primary) / 0.06)' }}
+                    >
+                      <Search className="size-3 text-primary" style={addressLookup.phase === "looking" ? { animation: 'dot-pulse 1.4s ease-in-out infinite' } : undefined} />
+                      <span className="text-[10px] font-bold tracking-[0.15em] uppercase text-primary">
                         {addressLookup.phase === "looking" ? "Searching address book…" : "Contacts resolved"}
                       </span>
+                      <div className="ml-auto flex gap-0.5">
+                        <div className="size-1.5 rounded-full" style={{ background: 'hsl(var(--primary) / 0.6)' }} />
+                        <div className="size-1.5 rounded-full" style={{ background: 'hsl(var(--primary) / 0.4)' }} />
+                        <div className="size-1.5 rounded-full" style={{ background: 'hsl(var(--primary) / 0.2)' }} />
+                      </div>
                     </div>
                     {/* Rows */}
-                    <div className="flex flex-col divide-y">
+                    <div className="flex flex-col divide-y divide-primary/10">
                       {addressLookup.names.map((name, i) => {
                         const resolvedEntry = addressLookup.resolved[i]
                         return (
                           <div
                             key={name}
-                            className="flex items-center gap-3 px-4 py-2.5"
-                            style={resolvedEntry ? { animation: `row-resolved 0.8s ease-out ${i * 0.12}s both` } : undefined}
+                            className="flex items-center gap-3 px-3 py-2.5"
+                            style={{
+                              animation: `agent-row-in 0.3s ease-out ${i * 0.08}s both`,
+                              ...(resolvedEntry ? { background: `hsl(var(--primary) / 0.04)` } : {}),
+                            }}
                           >
                             {resolvedEntry ? (
                               <>
-                                <Check
-                                  className="size-3.5 shrink-0 text-green-500"
-                                  style={{ animation: `check-pop 0.35s cubic-bezier(0.175,0.885,0.32,1.275) ${i * 0.12}s both` }}
-                                />
+                                <div
+                                  className="flex items-center justify-center size-5 rounded-full shrink-0"
+                                  style={{
+                                    background: 'rgb(74 222 128 / 0.15)',
+                                    border: '1px solid rgb(74 222 128 / 0.4)',
+                                    animation: `check-pop 0.35s cubic-bezier(0.175,0.885,0.32,1.275) ${i * 0.12}s both`,
+                                  }}
+                                >
+                                  <Check className="size-2.5 text-green-400" />
+                                </div>
                                 <div style={{ animation: `email-reveal 0.25s ease-out ${i * 0.12 + 0.1}s both`, opacity: 0 }}>
-                                  <span className="text-sm font-medium text-foreground">{name}</span>
-                                  <span className="text-xs text-muted-foreground ml-2">{resolvedEntry.email}</span>
+                                  <span className="text-sm font-semibold text-foreground">{name}</span>
+                                  <span className="text-xs ml-2" style={{ color: 'hsl(var(--primary) / 0.8)' }}>{resolvedEntry.email}</span>
                                 </div>
                               </>
                             ) : (
                               <>
-                                <div className="flex gap-0.5 shrink-0">
-                                  <div className="dot-1 size-1 rounded-full bg-muted-foreground" />
-                                  <div className="dot-2 size-1 rounded-full bg-muted-foreground" />
-                                  <div className="dot-3 size-1 rounded-full bg-muted-foreground" />
+                                <div className="flex gap-0.5 shrink-0 items-center">
+                                  <div className="dot-1 size-1.5 rounded-full" style={{ background: 'hsl(var(--primary) / 0.7)' }} />
+                                  <div className="dot-2 size-1.5 rounded-full" style={{ background: 'hsl(var(--primary) / 0.7)' }} />
+                                  <div className="dot-3 size-1.5 rounded-full" style={{ background: 'hsl(var(--primary) / 0.7)' }} />
                                 </div>
                                 <span className="text-sm text-muted-foreground">{name}</span>
                               </>
@@ -260,31 +423,76 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
                       })}
                     </div>
                   </div>
-                ) : (
-                  /* Generic badge for subject / body */
+
+                </div>
+              ) : attachState.isExecuting ? (
+                /* ── AGENT TAKEOVER: Attach files ── */
+                <div className="agent-takeover-card flex flex-col items-center gap-5 px-6 py-8 relative" style={{ minWidth: 300, maxWidth: 380 }}>
+                  {/* Scanning line */}
                   <div
-                    className="flex flex-col items-center gap-3"
-                    style={{ animation: 'ai-glow 2s ease-in-out infinite' }}
-                  >
-                    <div
-                      className="flex items-center gap-2.5 rounded-full border bg-background/95 px-5 py-2.5 shadow-xl"
-                      style={{ borderColor: 'hsl(var(--primary) / 0.4)' }}
-                    >
-                      <Bot className="size-4 text-primary" />
-                      <span className="text-sm font-medium text-foreground">
-                        Writing {genericTool}
-                      </span>
-                      <span className="ai-cursor text-primary font-bold text-base leading-none">|</span>
-                      <div className="flex items-center gap-1 ml-1">
-                        <div className="dot-1 size-1.5 rounded-full bg-primary" />
-                        <div className="dot-2 size-1.5 rounded-full bg-primary" />
-                        <div className="dot-3 size-1.5 rounded-full bg-primary" />
-                      </div>
+                    className="agent-scan-line absolute inset-x-0 h-[2px] pointer-events-none"
+                    style={{
+                      background: 'linear-gradient(90deg, transparent 0%, hsl(var(--primary) / 0.8) 20%, hsl(var(--primary)) 50%, hsl(var(--primary) / 0.8) 80%, transparent 100%)',
+                      filter: 'blur(1px)',
+                      zIndex: 10,
+                    }}
+                  />
+
+                  {/* Orbital icon */}
+                  <div className="relative flex items-center justify-center" style={{ width: 88, height: 88 }}>
+                    <div className="agent-pulse-ring absolute inset-0 rounded-full" style={{ border: '2px solid hsl(var(--primary) / 0.6)' }} />
+                    <div className="agent-pulse-ring-2 absolute inset-0 rounded-full" style={{ border: '1px solid hsl(var(--primary) / 0.3)' }} />
+                    <div className="agent-icon-spin absolute inset-[-8px] rounded-full" style={{ border: '2px dashed hsl(var(--primary) / 0.35)' }} />
+                    <div className="agent-icon-spin-reverse absolute inset-[-2px] rounded-full" style={{ border: '1.5px solid transparent', background: 'linear-gradient(hsl(var(--background)), hsl(var(--background))) padding-box, conic-gradient(from 0deg, hsl(var(--primary)), transparent 40%, hsl(var(--primary)) 60%, transparent) border-box' }} />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="agent-orbit-dot absolute size-2 rounded-full bg-primary shadow-[0_0_6px_hsl(var(--primary))]" />
+                      <div className="agent-orbit-dot-2 absolute size-1.5 rounded-full" style={{ background: 'hsl(var(--primary) / 0.7)', boxShadow: '0 0 4px hsl(var(--primary))' }} />
+                      <div className="agent-orbit-dot-3 absolute size-1.5 rounded-full" style={{ background: 'hsl(var(--primary) / 0.5)', boxShadow: '0 0 4px hsl(var(--primary))' }} />
                     </div>
-                    <p className="text-xs text-muted-foreground">AI is updating your draft — editing paused</p>
+                    <div className="relative flex items-center justify-center rounded-full size-14" style={{ background: 'radial-gradient(circle, hsl(var(--primary) / 0.15) 0%, hsl(var(--primary) / 0.05) 100%)', border: '1.5px solid hsl(var(--primary) / 0.4)', boxShadow: '0 0 20px hsl(var(--primary) / 0.2), inset 0 0 12px hsl(var(--primary) / 0.1)' }}>
+                      <Paperclip className="size-7 text-primary" style={{ filter: 'drop-shadow(0 0 6px hsl(var(--primary) / 0.8))' }} />
+                    </div>
                   </div>
-                )}
-              </div>
+
+                  {/* Labels */}
+                  <div className="flex flex-col items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 rounded-full px-3 py-1" style={{ background: 'hsl(var(--primary) / 0.1)', border: '1px solid hsl(var(--primary) / 0.3)' }}>
+                      <div className="dot-1 size-1.5 rounded-full bg-primary" />
+                      <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-primary">Agent Active</span>
+                      <div className="dot-3 size-1.5 rounded-full bg-primary" />
+                    </div>
+                    <h2 className="agent-title text-2xl font-black tracking-[0.12em] uppercase text-center" style={{ color: 'hsl(var(--primary))' }}>
+                      Fetching Files
+                    </h2>
+                    <p className="text-xs text-muted-foreground tracking-wide text-center">
+                      The agent is retrieving your attachments
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                /* Generic badge for subject / body */
+                <div
+                  className="agent-takeover-card flex flex-col items-center gap-3"
+                  style={{ animation: 'ai-glow 2s ease-in-out infinite' }}
+                >
+                  <div
+                    className="flex items-center gap-2.5 rounded-full border bg-background/95 px-5 py-2.5 shadow-xl"
+                    style={{ borderColor: 'hsl(var(--primary) / 0.4)' }}
+                  >
+                    <Bot className="size-4 text-primary" />
+                    <span className="text-sm font-medium text-foreground">
+                      Writing {genericTool}
+                    </span>
+                    <span className="ai-cursor text-primary font-bold text-base leading-none">|</span>
+                    <div className="flex items-center gap-1 ml-1">
+                      <div className="dot-1 size-1.5 rounded-full bg-primary" />
+                      <div className="dot-2 size-1.5 rounded-full bg-primary" />
+                      <div className="dot-3 size-1.5 rounded-full bg-primary" />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">AI is updating your draft — editing paused</p>
+                </div>
+              )}
             </div>
           )}
         <div className="flex flex-1 flex-col gap-0 overflow-auto">
@@ -422,7 +630,34 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
             placeholder="Write your message…"
           />
         </div>
-        </div>
+        {attachments.length > 0 && (
+          <>
+            <Separator />
+            <div className="flex flex-wrap gap-2 px-4 py-3">
+              {attachments.map((file) => (
+                <div
+                  key={file.name}
+                  className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-sm"
+                  style={{ animation: 'agent-row-in 0.3s ease-out both' }}
+                >
+                  <FileText className="size-4 text-primary shrink-0" />
+                  <div className="flex flex-col leading-tight">
+                    <span className="font-medium text-foreground text-xs">{file.name}</span>
+                    <span className="text-[10px] text-muted-foreground">{file.size}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAttachments((prev) => prev.filter((a) => a.name !== file.name))}
+                    className="ml-1 rounded-sm opacity-50 hover:opacity-100 transition-opacity"
+                    tabIndex={-1}
+                  >
+                    <X className="size-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
         <Separator />
         <div className="flex items-center gap-2 p-4">
           <Button size="sm" className="gap-1.5">
