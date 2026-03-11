@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Reply, Forward, Trash2, Send, Bot, Search, Check } from "lucide-react"
+import { Reply, Forward, Trash2, Send, Bot, Search, Check, Paperclip, FileText, X } from "lucide-react"
 import { useAgentTool } from "react-agent-tool"
 import { RichTextEditor } from "@/components/rich-text-editor"
 import { Button } from "@/components/ui/button"
@@ -159,13 +159,43 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
     enabled: composing,
   })
 
+  const [attachments, setAttachments] = React.useState<{ name: string; size: string; type: string }[]>([])
+
+  const { state: attachState } = useAgentTool({
+    name: "attach_files",
+    description: "Attach relevant files to the email draft. The file picker will be shown to the user and the selected files will be attached.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        files: {
+          type: "array",
+          items: { type: "string" },
+          description: "List of file names to attach, e.g. [\"proposal.docx\"]",
+        },
+      },
+      required: ["files"],
+    },
+    execute: async () => {
+      await new Promise((resolve) => setTimeout(resolve, 1800))
+      setAttachments((prev) => {
+        const existing = new Set(prev.map((a) => a.name))
+        const toAdd = [{ name: "proposal.docx", size: "248 KB", type: "docx" }].filter(
+          (f) => !existing.has(f.name)
+        )
+        return [...prev, ...toAdd]
+      })
+      return { success: true, attached: ["proposal.docx"] }
+    },
+    enabled: composing,
+  })
+
   const showAddressCard = addressState.isExecuting || addressLookup.phase !== "idle"
   const genericTool = subjectState.isExecuting
     ? "subject line"
     : bodyState.isExecuting
     ? "message body"
     : null
-  const isAnyExecuting = showAddressCard || genericTool !== null
+  const isAnyExecuting = showAddressCard || genericTool !== null || attachState.isExecuting
 
   const handleDiscard = () => {
     setTo([])
@@ -178,6 +208,7 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
     setShowBcc(false)
     setSubject("")
     setBody("")
+    setAttachments([])
     onStopCompose()
   }
 
@@ -389,6 +420,26 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
                   </div>
 
                 </div>
+              ) : attachState.isExecuting ? (
+                /* Attach files badge */
+                <div
+                  className="agent-takeover-card flex flex-col items-center gap-3"
+                  style={{ animation: 'ai-glow 2s ease-in-out infinite' }}
+                >
+                  <div
+                    className="flex items-center gap-2.5 rounded-full border bg-background/95 px-5 py-2.5 shadow-xl"
+                    style={{ borderColor: 'hsl(var(--primary) / 0.4)' }}
+                  >
+                    <Paperclip className="size-4 text-primary" style={{ animation: 'agent-icon-spin 2s linear infinite' }} />
+                    <span className="text-sm font-medium text-foreground">Fetching files</span>
+                    <div className="flex items-center gap-1 ml-1">
+                      <div className="dot-1 size-1.5 rounded-full bg-primary" />
+                      <div className="dot-2 size-1.5 rounded-full bg-primary" />
+                      <div className="dot-3 size-1.5 rounded-full bg-primary" />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Agent is attaching files — one moment</p>
+                </div>
               ) : (
                 /* Generic badge for subject / body */
                 <div
@@ -551,6 +602,34 @@ export function EmailContent({ selectedEmail, composing, onStopCompose }: Props)
           />
         </div>
         </div>
+        {attachments.length > 0 && (
+          <>
+            <Separator />
+            <div className="flex flex-wrap gap-2 px-4 py-3">
+              {attachments.map((file) => (
+                <div
+                  key={file.name}
+                  className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-sm"
+                  style={{ animation: 'agent-row-in 0.3s ease-out both' }}
+                >
+                  <FileText className="size-4 text-primary shrink-0" />
+                  <div className="flex flex-col leading-tight">
+                    <span className="font-medium text-foreground text-xs">{file.name}</span>
+                    <span className="text-[10px] text-muted-foreground">{file.size}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAttachments((prev) => prev.filter((a) => a.name !== file.name))}
+                    className="ml-1 rounded-sm opacity-50 hover:opacity-100 transition-opacity"
+                    tabIndex={-1}
+                  >
+                    <X className="size-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
         <Separator />
         <div className="flex items-center gap-2 p-4">
           <Button size="sm" className="gap-1.5">
