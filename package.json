@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "dev:email": "pnpm --filter email dev",
+    "dev:form_builder": "pnpm --filter form_builder dev",
     "build:all": "pnpm --filter './apps/*' build",
     "lint:all": "pnpm --filter './apps/*' lint"
   },
